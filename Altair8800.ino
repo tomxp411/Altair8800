@@ -67,6 +67,7 @@ void read_inputs_serial();
 void process_inputs();
 void empty_input_buffer();
 void rtc_setup();
+void print_help_menu();
 
 #if USE_THROTTLE>0
 uint32_t  throttle_micros = 0;
@@ -728,6 +729,8 @@ void read_inputs_serial()
       Serial.println('\n');
     }
 #endif
+  else if( data == '?' ) 
+    print_help_menu();
   else if( data == 'X' )
     cswitch |= BIT(SW_EXAMINE);
   else if( data == 'x' )
@@ -1692,10 +1695,8 @@ void setup()
     {
       regPC = a;
       host_clr_status_led_WAIT();
-    }
+    }    
 }
-
-
 
 void loop() 
 {
@@ -1833,4 +1834,26 @@ void loop()
       if( altair_interrupts&INT_SW_STOP ) switch_interrupt_handler();
 #endif
     }
+}
+
+// Prints the help menu in stop mode (ie: serial input/debug menu)
+void print_help_menu()
+{
+    Serial.println();
+    Serial.println(F("Altairduino Serial Console / Debugger"));
+    Serial.println(F("[u] Run(sw) Prog    [U] run(preset program)"));
+    Serial.println(F("[> ] Run at addr    [n] Octal / Dec / Hex mode"));
+    Serial.println(F("[L] Load Memory     [H] Upload Hex File"));
+    Serial.println(F("[C] Configuration"));
+    Serial.println();
+    Serial.println(F("Command Switches"));
+    Serial.println(F("[X] Examine(sw)     [x] Examine Next"));
+    Serial.println(F("[P] Deposit(sw)     [p] Deposit Next"));
+    Serial.println(F("[r] Run             [T] Step"));
+    Serial.println(F("[R] Reset           [!] Hard Reset"));
+    Serial.println(F("[Q /q] Protect / Unprotect"));
+    Serial.println();
+    Serial.println(F("Debug / Monitor commands(Space to continue, Enter to end)"));
+    Serial.println(F("[M] Examine Memory  [D] Disassemble"));
+    Serial.print(F("Command: "));
 }
