@@ -183,7 +183,11 @@ void process_inputs()
 		// B Mode: set accumulator to value in switches A0-A7
 		if (config_b_mode() && (cswitch & BIT(SW_EXAMINE)) == 0 && (host_read_function_switch_debounced(SW_EXAMINE) == 0))
 		{
-			regA = dswitch & 0x00ff;
+			regA = host_read_addr_switches() & 0xff;
+			if (config_serial_debug_enabled())
+			{
+				cpu_print_registers();
+			}
 		}
 		// non-B mode, or EXAMINE switch is held up, load program selected from switches
 		else
@@ -273,13 +277,12 @@ void process_inputs()
 		// B Mode: examine the Accumulator if EXAMINE is not up
 		else if (config_b_mode() && (cswitch & BIT(SW_EXAMINE)) == 0 && (host_read_function_switch_debounced(SW_EXAMINE) == 0))
 		{
-			//debug
-			if (config_serial_input_enabled())
-			{
-				//Serial.print("A: ");
-				//Serial.println(regA);
-			}
 			altair_set_outputs(regPC, regA);
+
+			if (config_serial_debug_enabled())
+			{
+				cpu_print_registers();
+			}
 		}
 		else
 		{
@@ -331,8 +334,18 @@ void process_inputs()
 
 	if (cswitch & BIT(SW_AUX2DOWN))
 	{
-		if (false)
+		if (config_b_mode() && (cswitch & BIT(SW_EXAMINE)) == 0 && (host_read_function_switch_debounced(SW_EXAMINE) == 0))
 		{
+			byte port = host_read_sense_switches();
+			host_clr_status_led_WAIT(); // workaround to prevent altair_out from blocking
+			altair_out(port, regA);
+			host_set_status_led_WAIT();
+
+			Serial.print(F("Write port "));
+			numsys_print_byte_hex(port);
+			Serial.print(F(" data "));
+			numsys_print_byte_hex(regA);
+			Serial.println();
 		}
 #if NUM_DRIVES>0
 		else if ((dswitch & 0xF000) == 0x1000)
@@ -433,8 +446,29 @@ void process_inputs()
 	}
 	else if (cswitch & BIT(SW_AUX2UP))
 	{
-		if (false)
+		// B Mode: Input from port to A register
+		if (config_b_mode() && (cswitch & BIT(SW_EXAMINE)) == 0 && (host_read_function_switch_debounced(SW_EXAMINE) == 0))
 		{
+			host_clr_status_led_WAIT(); // workaround to prevent altair_out from blocking
+			byte port = host_read_sense_switches();
+			//host_set_status_led_INP();
+			//byte data = io_inp(port);
+			//altair_set_outputs(port << 8 || port, data);
+			//host_clr_status_led_INP();
+			//regA = data;
+			regA = altair_in(port);
+			host_set_status_led_WAIT(); // workaround to prevent altair_out from blocking
+
+			if (config_serial_debug_enabled())
+			{
+				Serial.print(F("Read port "));
+				numsys_print_byte_hex(port);
+				Serial.print(F(" data "));
+				numsys_print_byte_hex(regA);
+				Serial.println();
+
+				//cpu_print_registers();
+			}
 		}
 #if NUM_DRIVES>0
 		else if ((dswitch & 0xF000) == 0x1000)
@@ -1588,7 +1622,7 @@ byte altair_read_sense_switches(byte port)
 
 void altair_out(byte port, byte data)
 {
-	host_set_addr_leds(port | port * 256);
+	host_set_addr_leds(port << 8 | port);
 
 #if USE_IO_BUS>0
 	// When using the I/O bus we must put the output data
