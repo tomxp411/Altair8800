@@ -28,6 +28,25 @@ across cycles. We would like to test the current behavior first and iron out any
 
 ## SdFat
 
-SdFat 1.1.1 is required. You will need to downgrade to SdFat in the Arduino IDE to compile this version of the software.
+SdFat 1.1.4 is required. You will need to downgrade to SdFat in the Arduino IDE to compile this version of the software.
 
+
+## AutoRun Feature
+
+You can now automatially select a configuration profile and launch a ROM or boot a disk at startup.
+
+To select a configuration profile, set the front panel switch 7 up. Select the profile number you'd like to load
+on switches 0-6. WHen you power up the system, the selected profile will automatically be loaded. This makes
+it easy to do things like switch to different terminals or use the USB connection without having to hold DEPOSIT
+every time you start the Altair.
+
+Turn SW7 off to disable profile selection. 
+
+You can also automatically launch a selected program on system startup. From the configuration menu, select
+an Aux1 program (u/U) that you would like to launch. Then set Auto Start to Enabled with "1", and save your
+settings to a profile.
+
+If this is saved to profile 0, the Altair will launch your program at boot. If this is saved to profiles 1
+and up, you will need to select the profile with the front panel switches. (Hold DEPOSIT at boot, or set SW7 up
+to load the profile set by SW0-SW6.)
 
