@@ -227,4 +227,10 @@ void set_b_mode(uint32_t Enabled);
 void toggle_b_mode();
 void print_b_mode();
 
+extern bool auto_start_started;
+bool config_auto_start();
+void set_auto_start(uint32_t Enabled);
+void toggle_auto_start();
+void print_auto_start(byte row, byte col);
+
 #endif

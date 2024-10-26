@@ -8,6 +8,8 @@
 
 #include "config.h"
 #include "switch_serial.h"
+
+// Requires SdFat 1.1.4 or earlier. WILL NOT WORK with 2.x
 #include <SdFat.h>
 
 

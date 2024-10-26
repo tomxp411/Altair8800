@@ -151,6 +151,80 @@ byte get_device(byte switches)
 	return dev;
 }
 
+void launch_default_program()
+{
+  if ((cswitch & BIT(SW_STOP)) || host_read_function_switch_debounced(SW_STOP))
+  {
+    // STOP is up => edit configuration
+    config_edit();
+    cswitch = 0;
+    if (config_serial_panel_enabled())
+    {
+      Serial.print(F("\033[14B"));
+      print_panel_serial(true);
+    }
+
+    p_regPC = ~regPC;
+    altair_set_outputs(regPC, MREAD(regPC));
+    rtc_setup();
+  }
+  // B Mode: examine the Accumulator if EXAMINE is not up
+  else if (config_b_mode() && (cswitch & BIT(SW_EXAMINE)) == 0 && (host_read_function_switch_debounced(SW_EXAMINE) == 0))
+  {
+    altair_set_outputs(regPC, regA);
+
+    if (config_serial_debug_enabled())
+    {
+      cpu_print_registers();
+    }
+  }
+  else
+  {
+    // program shortcut
+    byte p = config_aux1_program();
+    if (p < 0x40)
+    {
+      if (prog_get_name(p) != NULL)
+      {
+        // run program
+        dswitch = (dswitch & 0xff00) | p;
+        cswitch = BIT(SW_AUX1DOWN);
+        process_inputs();
+      }
+    }
+    else if (p < 0x80)
+    {
+      // run tarbell disk (first mount disk then install and run tarbell disk boot ROM)
+      tdrive_reset();
+      if (tdrive_mount(0, p & 0x3f))
+      {
+        dswitch = (dswitch & 0xff00) | 16;
+        cswitch = BIT(SW_AUX1DOWN);
+        process_inputs();
+      }
+    }
+    else if (p < 0xC0)
+    {
+      // run disk (first mount disk then install and run disk boot ROM)
+      if (drive_mount(0, p & 0x3f))
+      {
+        dswitch = (dswitch & 0xff00) | 8;
+        cswitch = BIT(SW_AUX1DOWN);
+        process_inputs();
+      }
+    }
+    else
+    {
+      // run hard disk (first mount disk then install and run hard disk boot ROM)
+      if (hdsk_mount(0, 0, p & 0x3f))
+      {
+        dswitch = (dswitch & 0xff00) | 14;
+        cswitch = BIT(SW_AUX1DOWN);
+        process_inputs();
+      }
+    }
+  }
+}
 
 void process_inputs()
 {
@@ -259,77 +333,7 @@ void process_inputs()
 	}
 	else if (cswitch & BIT(SW_AUX1UP))
 	{
-		if ((cswitch & BIT(SW_STOP)) || host_read_function_switch_debounced(SW_STOP))
-		{
-			// STOP is up => edit configuration
-			config_edit();
-			cswitch = 0;
-			if (config_serial_panel_enabled())
-			{
-				Serial.print(F("\033[14B"));
-				print_panel_serial(true);
-			}
-
-			p_regPC = ~regPC;
-			altair_set_outputs(regPC, MREAD(regPC));
-			rtc_setup();
-		}
-		// B Mode: examine the Accumulator if EXAMINE is not up
-		else if (config_b_mode() && (cswitch & BIT(SW_EXAMINE)) == 0 && (host_read_function_switch_debounced(SW_EXAMINE) == 0))
-		{
-			altair_set_outputs(regPC, regA);
-
-			if (config_serial_debug_enabled())
-			{
-				cpu_print_registers();
-			}
-		}
-		else
-		{
-			// program shortcut
-			byte p = config_aux1_program();
-			if (p < 0x40)
-			{
-				if (prog_get_name(p) != NULL)
-				{
-					// run program
-					dswitch = (dswitch & 0xff00) | p;
-					cswitch = BIT(SW_AUX1DOWN);
-					process_inputs();
-				}
-			}
-			else if (p < 0x80)
-			{
-				// run tarbell disk (first mount disk then install and run tarbell disk boot ROM)
-				tdrive_reset();
-				if (tdrive_mount(0, p & 0x3f))
-				{
-					dswitch = (dswitch & 0xff00) | 16;
-					cswitch = BIT(SW_AUX1DOWN);
-					process_inputs();
-				}
-			}
-			else if (p < 0xC0)
-			{
-				// run disk (first mount disk then install and run disk boot ROM)
-				if (drive_mount(0, p & 0x3f))
-				{
-					dswitch = (dswitch & 0xff00) | 8;
-					cswitch = BIT(SW_AUX1DOWN);
-					process_inputs();
-				}
-			}
-			else
-			{
-				// run hard disk (first mount disk then install and run hard disk boot ROM)
-				if (hdsk_mount(0, 0, p & 0x3f))
-				{
-					dswitch = (dswitch & 0xff00) | 14;
-					cswitch = BIT(SW_AUX1DOWN);
-					process_inputs();
-				}
-			}
-		}
+    launch_default_program();
 	}
 
 	if (cswitch & BIT(SW_AUX2DOWN))
@@ -1272,7 +1276,6 @@ void print_dbg_info()
 }
 
 
-
 void reset(bool resetPC)
 {
 	host_clr_status_led_INT();
@@ -1709,6 +1712,7 @@ void setup()
 {
 	cswitch = 0;
 	dswitch = 0;
+  auto_start_started = 0;
 
 	drive_get_image_filename(0x99, true);
 
@@ -1727,6 +1731,9 @@ void setup()
 		config_setup(-1);
 	else if (host_read_function_switch(SW_DEPOSIT))
 		config_setup(host_read_addr_switches());
+  // auto load configuration if A15 is on
+  else if (host_read_addr_switches() & 0x80)
+		config_setup(host_read_addr_switches() & 0x007F);
 	else
 		config_setup(0);
 	cpu_setup();
@@ -1799,7 +1806,19 @@ void loop()
 	byte opcode;
 
 	// if we are NOT in WAIT mode then enter the main simulation loop
-	if (!host_read_status_led_WAIT())
+	if (host_read_status_led_WAIT())
+  {
+    if(config_auto_start() && !auto_start_started)
+    {
+        auto_start_started = true;
+        Serial.println("\x1b[2J\x1b[H");
+        Serial.println("Executing boot ROM");
+        Serial.println();
+
+        launch_default_program();
+    }
+  }
+  else
 	{
 		// clear all switch-related interrupts before starting loop
 		altair_interrupts &= ~INT_SWITCH;

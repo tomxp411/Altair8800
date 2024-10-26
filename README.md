@@ -25,3 +25,9 @@ https://groups.google.com/forum/#!forum/altair-duino
 The LEDs in B mode don't always operate exactly like a real 8800B. On a real system, the LEDs would be on momentarily and go back off as soon as
 the switch is released. That is not yet implemented in the emulator, as it will require additional code to track the state of the switches
 across cycles. We would like to test the current behavior first and iron out any bugs before tracking the switches over time. 
+
+## SdFat
+
+SdFat 1.1.1 is required. You will need to downgrade to SdFat in the Arduino IDE to compile this version of the software.
+
+

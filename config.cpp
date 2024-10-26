@@ -83,7 +83,7 @@ uint32_t config_flags;
 
 
 // config_flags2:
-// xxxxxxxx BAPKKKMM MMMMDDDD DDVVVZZZ
+// xxxxxxxS BAPKKKMM MMMMDDDD DDVVVZZZ
 // ZZZ  = map dazzler to host interface (000=NONE, 001=1st, 010=2nd, 011=3rd, 100=4th, 101=5th)
 // VVV  = map VDM-1   to host interface (see above)
 // D    = VDM-1 dip switch settings
@@ -91,7 +91,7 @@ uint32_t config_flags;
 // KKK  = map VDM-1 keyboard to serial device (000=NONE, 1=SIO, 2=ACR, 3=2SIO1, 4=2SIO2, 5=2SIO3, 6=2SIO4)
 // P    = Processor (0=i8080, 1=z80)
 // B    = B Mode - Aux1 is Display/Load, Aux2 is Input/Output, Examine+Aux1 for classic functions.
-//        
+// S    = Auto-Start, run Aux1 program on boot   
 uint32_t config_flags2;
 
 
@@ -151,6 +151,8 @@ uint32_t config_mem_size;
 byte config_printer_generic_status_busy;
 byte config_printer_generic_status_ready;
 
+// did the emulator launch the Aux1 program at boot?
+bool auto_start_started = false;
 
 // --------------------------------------------------------------------------------
 
@@ -857,7 +859,6 @@ static void print_aux1_program(byte row = 0, byte col = 0)
 			Serial.print(image);
 	}
 }
-
 
 static void print_drive_mounted()
 {
@@ -3115,7 +3116,7 @@ void config_edit()
 	bool redraw = true;
 
 	config_mem_size = ((uint32_t)mem_get_ram_limit_usr()) + 1;
-	byte row, col, r_cpu, r_profile, r_throttle, r_panel, r_debug, r_aux1, r_cmd, r_input, r_dazzler, r_b_mode;
+	byte row, col, r_cpu, r_profile, r_throttle, r_panel, r_debug, r_aux1, r_auto_start, r_cmd, r_input, r_dazzler, r_b_mode;
 	while (true)
 	{
 		char c;
@@ -3145,6 +3146,7 @@ void config_edit()
 			Serial.print(F("Pro(c)essor                 : ")); print_cpu(); Serial.println(); r_cpu = row++;
 #endif
 			Serial.print(F("Aux1 shortcut program (u/U) : ")); print_aux1_program(); Serial.println(); r_aux1 = row++;
+			Serial.print(F("Aux(1) auto start           : ")); print_auto_start(0,0); Serial.println(); r_auto_start = row++;
 			Serial.print(F("Configure host (s)erial     : "));
 #if HOST_NUM_SERIAL_PORTS>1
 			Serial.print(F("Primary: "));
@@ -3242,6 +3244,10 @@ void config_edit()
 		case 'd': toggle_flag(CF_SERIAL_DEBUG, r_debug, col); redraw = false; break;
 		case 'u': toggle_aux1_program_up(r_aux1, col); redraw = false; break;
 		case 'U': toggle_aux1_program_down(r_aux1, col); redraw = false; break;
+    case '1': 
+      toggle_auto_start(); 
+      print_auto_start(r_auto_start, col);
+      redraw = false; break;
 		case 's': config_host_serial(); break;
 		case 'E': config_serial_devices(); break;
 		case 'm': config_memory(); break;
@@ -3533,4 +3539,30 @@ void config_setup(int n)
 		apply_host_serial_settings(new_config_serial_settings, new_config_serial_settings2);
 		mem_set_ram_limit_usr(config_mem_size - 1);
 	}
+
+}
+
+void print_auto_start(byte row=0, byte col=0)
+{
+  if (row != 0 || col != 0) set_cursor(row, col);
+
+	if(config_auto_start())
+		Serial.print("Enabled");
+	else
+		Serial.print("Disabled");
+}
+
+bool config_auto_start()
+{
+	return get_bits(config_flags2, 24, 1) ? true : false;
+}
+
+void set_auto_start(uint32_t Enabled)
+{
+	set_bits(config_flags2, 24, 1, Enabled);
+}
+
+void toggle_auto_start()
+{
+	config_flags2 = toggle_bits(config_flags2, 24, 1);
 }
